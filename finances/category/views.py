@@ -6,7 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user

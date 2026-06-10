@@ -6,7 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 
 class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
-    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save()
