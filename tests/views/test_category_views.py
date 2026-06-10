@@ -71,3 +71,82 @@ class TestCategoryViews:
         data = {"name": "Testing", "category_type": "expense", "color": "#FF5733"}
         response = self.client.post(reverse("category-list"), data=data)
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_unauthenticated_user_cannot_retrieve_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_authenticated_user_can_update_own_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        data = {
+            "name": "Updated Category",
+            "category_type": "expense",
+            "color": "#FF5733",
+        }
+        response = self.client.put(
+            reverse("category-detail", args=[category.id]), data=data
+        )
+        assert response.status_code == status.HTTP_200_OK
+        category.refresh_from_db()
+        assert category.name == "Updated Category"
+        assert category.category_type == "expense"
+        assert category.color == "#FF5733"
+
+    def test_authenticated_user_cannot_update_others_category(self):
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        category = Category.objects.create(
+            user=another_user,
+            name="Another Category",
+            category_type="expense",
+            color="#FF0000",
+        )
+        data = {
+            "name": "Updated Category",
+            "category_type": "income",
+            "color": "#00FF00",
+        }
+        response = self.client.put(
+            reverse("category-detail", args=[category.id]), data=data
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_authenticated_user_can_delete_own_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        assert Category.objects.filter(id=category.id).exists()
+        response = self.client.delete(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Category.objects.filter(id=category.id).exists()
+
+    def test_authenticated_user_cannot_delete_others_category(self):
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        category = Category.objects.create(
+            user=another_user,
+            name="Another Category",
+            category_type="expense",
+            color="#FF0000",
+        )
+        assert Category.objects.filter(id=category.id).exists()
+        response = self.client.delete(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert Category.objects.filter(id=category.id).exists()
