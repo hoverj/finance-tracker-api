@@ -15,6 +15,8 @@ class Transaction(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        # Ensure that the empty string fields are not saved as empty strings but rather as null values
+        self.full_clean()
         # Ensure that only transactions with a category of the correct type can be saved
         if self.category.category_type == Category.INCOME and self.amount < 0:
             raise ValueError("Income transactions must have a positive amount.")

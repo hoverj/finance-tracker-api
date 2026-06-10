@@ -1,0 +1,152 @@
+from rest_framework.test import APIClient
+from rest_framework import status
+import pytest
+from django.contrib.auth.models import User
+from django.urls import reverse
+from finances.category.models import Category
+
+
+class TestCategoryViews:
+    @pytest.fixture(autouse=True)
+    def setup(self, db):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_list_categories(self):
+        some_object = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        Category.objects.create(
+            user=another_user,
+            name="Another Category",
+            category_type="expense",
+            color="#FF0000",
+        )
+
+        response = self.client.get(reverse("category-list"))
+        assert response.status_code == status.HTTP_200_OK
+        assert isinstance(response.data, list)
+        assert len(response.data) == 1
+        assert response.data[0]["name"] == some_object.name
+
+    def test_successful_create_category(self):
+        data = {"name": "Testing", "category_type": "expense", "color": "#FF5733"}
+        response = self.client.post(reverse("category-list"), data=data)
+        assert response.status_code == status.HTTP_201_CREATED
+        assert Category.objects.filter(name="Testing", user=self.user).exists()
+
+    def test_failed_create_category_with_invalid_data(self):
+        data = {"name": "", "category_type": "invalid_type", "color": "not_a_color"}
+        response = self.client.post(reverse("category-list"), data=data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Category.objects.filter(name="", user=self.user).exists()
+
+    def test_user_ignored_on_create_category(self):
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        data = {
+            "name": "Testing",
+            "category_type": "income",
+            "color": "#00FF00",
+            "user": another_user.id,
+        }
+        response = self.client.post(reverse("category-list"), data=data)
+        assert response.status_code == status.HTTP_201_CREATED
+        category = Category.objects.get(name="Testing")
+        assert category.user == self.user
+
+    def test_unauthenticated_user_cannot_create_category(self):
+        self.client.force_authenticate(user=None)
+        data = {"name": "Testing", "category_type": "expense", "color": "#FF5733"}
+        response = self.client.post(reverse("category-list"), data=data)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_unauthenticated_user_cannot_retrieve_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_authenticated_user_can_update_own_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        data = {
+            "name": "Updated Category",
+            "category_type": "expense",
+            "color": "#FF5733",
+        }
+        response = self.client.put(
+            reverse("category-detail", args=[category.id]), data=data
+        )
+        assert response.status_code == status.HTTP_200_OK
+        category.refresh_from_db()
+        assert category.name == "Updated Category"
+        assert category.category_type == "expense"
+        assert category.color == "#FF5733"
+
+    def test_authenticated_user_cannot_update_others_category(self):
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        category = Category.objects.create(
+            user=another_user,
+            name="Another Category",
+            category_type="expense",
+            color="#FF0000",
+        )
+        data = {
+            "name": "Updated Category",
+            "category_type": "income",
+            "color": "#00FF00",
+        }
+        response = self.client.put(
+            reverse("category-detail", args=[category.id]), data=data
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_authenticated_user_can_delete_own_category(self):
+        category = Category.objects.create(
+            user=self.user,
+            name="Test Category",
+            category_type="income",
+            color="#00FF00",
+        )
+        assert Category.objects.filter(id=category.id).exists()
+        response = self.client.delete(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Category.objects.filter(id=category.id).exists()
+
+    def test_authenticated_user_cannot_delete_others_category(self):
+        another_user = User.objects.create_user(
+            username="anotheruser", password="anotherpass123"
+        )
+        category = Category.objects.create(
+            user=another_user,
+            name="Another Category",
+            category_type="expense",
+            color="#FF0000",
+        )
+        assert Category.objects.filter(id=category.id).exists()
+        response = self.client.delete(reverse("category-detail", args=[category.id]))
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert Category.objects.filter(id=category.id).exists()
