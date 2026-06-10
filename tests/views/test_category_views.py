@@ -70,7 +70,7 @@ class TestCategoryViews:
         self.client.force_authenticate(user=None)
         data = {"name": "Testing", "category_type": "expense", "color": "#FF5733"}
         response = self.client.post(reverse("category-list"), data=data)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_unauthenticated_user_cannot_retrieve_category(self):
         category = Category.objects.create(
@@ -81,7 +81,7 @@ class TestCategoryViews:
         )
         self.client.force_authenticate(user=None)
         response = self.client.get(reverse("category-detail", args=[category.id]))
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_authenticated_user_can_update_own_category(self):
         category = Category.objects.create(

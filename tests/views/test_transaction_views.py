@@ -86,7 +86,7 @@ class TestTransactionViews:
             "category": self.category_income.id,
         }
         response = self.client.post(reverse("transaction-list"), data=data)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_unauthenticated_user_cannot_retrieve_transaction(self):
         transaction = Transaction.objects.create(
@@ -97,7 +97,7 @@ class TestTransactionViews:
         )
         self.client.force_authenticate(user=None)
         response = self.client.get(reverse("transaction-detail", args=[transaction.id]))
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_authenticated_user_cannot_retrieve_other_users_transaction(self):
         another_user = User.objects.create_user(
